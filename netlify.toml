@@ -3,6 +3,14 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  NODE_VERSION = "22"
+  NODE_OPTIONS = "--max-old-space-size=4096"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["mysql2", "bcryptjs", "nodemailer", "express"]
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"

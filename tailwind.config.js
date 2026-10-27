@@ -3,7 +3,7 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
-    "./node_modules/calendarkit-pro/**/*.{js,mjs}",
+    "./node_modules/calendarkit-pro/dist/*.js",
   ],
   theme: {
     extend: {
