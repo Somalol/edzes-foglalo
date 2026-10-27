@@ -145,13 +145,13 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
     });
 
     await transporter.sendMail({
-      from: `"Csoportos Edzések" <${process.env.SMTP_USER}>`,
+      from: `"Jelenlét Pilates" <${process.env.SMTP_USER}>`,
       to: dbUser.email,
-      subject: 'Jelszó visszaállítása - Csoportos Edzések',
+      subject: 'Jelszó visszaállítása - Jelenlét Pilates',
       html: `
         <div style="font-family: sans-serif; color: #4A403A; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #EFE6DD; border-radius: 16px; background-color: #FDFBF7;">
-          <h2 style="color: #D88C9A; margin-top: 0;">Szia ${dbUser.name}!</h2>
-          <p>Új jelszó beállítását kezdeményezted a Csoportos Edzések oldalon.</p>
+          <h2 style="color: #D88C9A; margin-top: 0;">Kedves ${dbUser.name}!</h2>
+          <p>Új jelszó beállítását kezdeményezted a Jelenlét Pilates oldalon.</p>
           <p>Kattints az alábbi gombra az új jelszavad megadásához (a link <strong>15 percig</strong> érvényes):</p>
           <p style="margin: 28px 0;">
             <a href="${resetUrl}" style="background-color: #D88C9A; color: white; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block;">

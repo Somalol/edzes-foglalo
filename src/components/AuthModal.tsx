@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { X, LogIn, UserPlus, Mail, Lock, User as UserIcon, AlertCircle, CheckCircle2, KeyRound } from 'lucide-react';
+import { 
+  X, 
+  LogIn, 
+  UserPlus, 
+  Mail, 
+  Lock, 
+  User as UserIcon, 
+  AlertCircle, 
+  CheckCircle2, 
+  KeyRound,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 import { type User, type AgeRange } from '../types';
 
 interface AuthModalProps {
@@ -20,6 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [ageRange, setAgeRange] = useState<AgeRange>('26-35');
   const [error, setError] = useState('');
@@ -31,6 +44,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setError('');
       setSuccessMsg('');
       setPassword('');
+      setShowPassword(false);
       if (resetToken) {
         setMode('reset');
       } else if (mode === 'reset') {
@@ -43,6 +57,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError('');
     setSuccessMsg('');
     setPassword('');
+    setShowPassword(false);
     if (onClearResetToken) onClearResetToken();
     setMode(newMode);
   };
@@ -85,6 +100,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           if (onClearResetToken) onClearResetToken();
           setMode('login');
           setPassword('');
+          setShowPassword(false);
           setSuccessMsg(data.message);
         }
         setIsLoading(false);
@@ -254,14 +270,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="relative">
                 <Lock className="w-4 h-4 text-brand-muted absolute left-3.5 top-2.5" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   minLength={4}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-3 py-2 rounded-xl border border-pastel-sand bg-brand-bg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  className="w-full pl-10 pr-10 py-2 rounded-xl border border-pastel-sand bg-brand-bg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  title={showPassword ? 'Jelszó elrejtése' : 'Jelszó megjelenítése'}
+                  className="absolute right-3 top-2.5 text-brand-muted hover:text-brand-text transition"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
           )}
