@@ -40,6 +40,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'blog'>('calendar');
   const [events, setEvents] = useState<WorkoutEvent[]>([]);
   const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   // MODAL ÁLLAPOTOK
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
@@ -94,6 +95,17 @@ export default function App() {
     fetchWorkouts();
     fetchPosts();
   }, [fetchWorkouts, fetchPosts]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get('reset_token');
+    if (tokenFromUrl) {
+      setResetToken(tokenFromUrl);
+      setIsAuthModalOpen(true);
+      // Megtisztítjuk az URL-t a böngészősávban
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   const selectedWorkout = events.find((e) => e.id === selectedWorkoutId) || null;
 
@@ -348,6 +360,8 @@ export default function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
+        resetToken={resetToken}
+        onClearResetToken={() => setResetToken(null)}
       />
     </div>
   );

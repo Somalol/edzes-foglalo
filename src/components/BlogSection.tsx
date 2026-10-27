@@ -199,7 +199,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
               {/* Új komment írása (Csak belépett tagoknak és adminnak) */}
               {currentUser.role === 'guest' ? (
                 <div className="text-xs text-brand-muted bg-pastel-sand/50 p-3 rounded-xl text-center">
-                  A hozzászóláshoz kérlek, jelentkezz be! (Válts a fenti sávban „Belépett Tag” nézetre a teszteléshez).
+                  A hozzászóláshoz kérlek, jelentkezz be!
                 </div>
               ) : (
                 <form

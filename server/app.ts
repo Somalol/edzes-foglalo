@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from './db';
 import { type RowDataPacket, type ResultSetHeader } from 'mysql2';
+import nodemailer from 'nodemailer';
 
 export const app = express();
 app.use(cors());
@@ -113,6 +114,96 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Szerverhiba a belépés során.' });
+  }
+});
+
+// Elfelejtett jelszó - E-mail kiküldése
+app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM users WHERE email = ?', [email]);
+
+    // Biztonsági okból mindig ugyanazt a választ adjuk, hogy ne lehessen e-mail címeket kipuhatolni
+    if (rows.length === 0) {
+      return res.json({ message: 'Ha a megadott e-mail cím szerepel a rendszerben, elküldtük a visszaállító linket.' });
+    }
+
+    const dbUser = rows[0];
+    // A titkos kulcs tartalmazza a régi jelszó hash-t, így jelszócsere után a link azonnal érvénytelenné válik
+    const resetSecret = JWT_SECRET + dbUser.password_hash;
+    const resetToken = jwt.sign({ id: dbUser.id, email: dbUser.email }, resetSecret, { expiresIn: '15m' });
+
+    const origin = req.headers.origin || 'http://localhost:5173';
+    const resetUrl = `${origin}/?reset_token=${resetToken}`;
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"Csoportos Edzések" <${process.env.SMTP_USER}>`,
+      to: dbUser.email,
+      subject: 'Jelszó visszaállítása - Csoportos Edzések',
+      html: `
+        <div style="font-family: sans-serif; color: #4A403A; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #EFE6DD; border-radius: 16px; background-color: #FDFBF7;">
+          <h2 style="color: #D88C9A; margin-top: 0;">Szia ${dbUser.name}!</h2>
+          <p>Új jelszó beállítását kezdeményezted a Csoportos Edzések oldalon.</p>
+          <p>Kattints az alábbi gombra az új jelszavad megadásához (a link <strong>15 percig</strong> érvényes):</p>
+          <p style="margin: 28px 0;">
+            <a href="${resetUrl}" style="background-color: #D88C9A; color: white; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block;">
+              Új jelszó beállítása
+            </a>
+          </p>
+          <p style="font-size: 12px; color: #8C7E75;">Ha nem te kérted a jelszó-visszaállítást, hagyd figyelmen kívül ezt az üzenetet, a régi jelszavad változatlan marad.</p>
+        </div>
+      `,
+    });
+
+    res.json({ message: 'Ha a megadott e-mail cím szerepel a rendszerben, elküldtük a visszaállító linket.' });
+  } catch (err) {
+    console.error('E-mail küldési hiba:', err);
+    res.status(500).json({ error: 'Nem sikerült elküldeni az e-mailt. Kérlek, próbáld újra később.' });
+  }
+});
+
+// Új jelszó mentése a token alapján
+app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword || newPassword.length < 4) {
+      return res.status(400).json({ error: 'Érvénytelen adatok vagy túl rövid jelszó.' });
+    }
+
+    const decoded = jwt.decode(token) as { id?: number } | null;
+    if (!decoded || !decoded.id) {
+      return res.status(400).json({ error: 'Érvénytelen visszaállító link.' });
+    }
+
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM users WHERE id = ?', [decoded.id]);
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'A felhasználó nem található.' });
+    }
+
+    const dbUser = rows[0];
+    const resetSecret = JWT_SECRET + dbUser.password_hash;
+
+    try {
+      jwt.verify(token, resetSecret);
+    } catch {
+      return res.status(400).json({ error: 'A visszaállító link lejárt vagy már felhasználták.' });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [newPasswordHash, dbUser.id]);
+
+    res.json({ message: 'A jelszavad sikeresen megváltozott! Most már beléphetsz.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Szerverhiba a jelszó mentése során.' });
   }
 });
 
