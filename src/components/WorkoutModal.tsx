@@ -34,7 +34,7 @@ export const WorkoutModal: React.FC<WorkoutModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [baseTitle, setBaseTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState<WorkoutType>('alakformalo');
+  const [type, setType] = useState<WorkoutType>('dinamikus');
   const [dateStr, setDateStr] = useState('');
   const [startTimeStr, setStartTimeStr] = useState('17:00');
   const [endTimeStr, setEndTimeStr] = useState('18:00');
@@ -56,7 +56,7 @@ export const WorkoutModal: React.FC<WorkoutModalProps> = ({
       setIsEditing(true);
       setBaseTitle('');
       setDescription('');
-      setType('alakformalo');
+      setType('dinamikus');
       setDateStr(new Date().toISOString().split('T')[0]);
       setStartTimeStr('17:00');
       setEndTimeStr('18:00');

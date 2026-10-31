@@ -18,7 +18,7 @@ export interface Participant {
   userId?: string;
 }
 
-export type WorkoutType = 'alakformalo' | 'pilates' | 'nyujtas' | 'kardio';
+export type WorkoutType = 'dinamikus' | 'progressziv' | 'gerinc' | 'tini';
 
 export interface WorkoutEvent {
   id: string;
@@ -51,8 +51,8 @@ export interface BlogPost {
 
 
 export const WORKOUT_TYPES: Record<WorkoutType, { label: string; color: string }> = {
-  alakformalo: { label: 'Alakformáló', color: '#D88C9A' },
-  pilates: { label: 'Pilates & Core', color: '#8FA893' },
-  nyujtas: { label: 'Nyújtás & Mobilitás', color: '#9D8EC4' },
-  kardio: { label: 'Köredzés / Kardió', color: '#D9A07E' },
+  dinamikus: { label: 'Dinamikus Pilates', color: '#D88C9A' },
+  progressziv: { label: 'Progresszív Pilates', color: '#8FA893' },
+  gerinc: { label: 'Gerinc Pilates', color: '#9D8EC4' },
+  tini: { label: 'Tini Pilates', color: '#D9A07E' },
 };

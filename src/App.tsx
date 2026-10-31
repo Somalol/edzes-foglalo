@@ -57,7 +57,7 @@ export default function App() {
       if (!res.ok) return;
       const data = await res.json();
       const mapped: WorkoutEvent[] = data.map((w: any) => {
-        const wType = (w.type as WorkoutType) || 'alakformalo';
+        const wType = (w.type as WorkoutType) || 'dinamikus';
         return {
           ...w,
           start: new Date(w.start),
