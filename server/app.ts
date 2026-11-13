@@ -207,6 +207,121 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
   }
 });
 
+interface WorkoutRow extends RowDataPacket {
+  id: number;
+  base_title: string;
+  description?: string;
+  start_time: Date | string;
+  end_time: Date | string;
+  max_capacity: number;
+}
+
+// Segédfüggvény: Visszaigazoló e-mail + Google Naptár gomb + .ics melléklet
+async function sendBookingConfirmationEmail(
+  toEmail: string,
+  participantName: string,
+  workout: WorkoutRow
+) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+
+  const startDate = new Date(workout.start_time);
+  const endDate = new Date(workout.end_time);
+
+  // Google Calendar & iCal UTC formátum: YYYYMMDDTHHMMSSZ
+  const toCalUtc = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const startUtc = toCalUtc(startDate);
+  const endUtc = toCalUtc(endDate);
+
+  // Magyar nyelvű, olvasható dátum és időpont (budapesti időzónával)
+  const formattedDate = startDate.toLocaleDateString('hu-HU', {
+    timeZone: 'Europe/Budapest',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  });
+  const formattedStartTime = startDate.toLocaleTimeString('hu-HU', {
+    timeZone: 'Europe/Budapest',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const formattedEndTime = endDate.toLocaleTimeString('hu-HU', {
+    timeZone: 'Europe/Budapest',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const cleanDesc = workout.description || 'Csoportos Pilates edzés';
+
+  // 1. Közvetlen Google Naptár gomb URL
+  const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+    workout.base_title
+  )}&dates=${startUtc}/${endUtc}&details=${encodeURIComponent(cleanDesc)}`;
+
+  // 2. Szabványos .ics fájl (Apple Naptár, Outlook és Gmail fejléc kártyához)
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Csoportos Edzesek//HU',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:workout-${workout.id}-${Date.now()}@edzesfoglalo.hu`,
+    `DTSTAMP:${toCalUtc(new Date())}`,
+    `DTSTART:${startUtc}`,
+    `DTEND:${endUtc}`,
+    `SUMMARY:${workout.base_title}`,
+    `DESCRIPTION:${cleanDesc.replace(/\r?\n/g, '\\n')}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  await transporter.sendMail({
+    from: `"Csoportos Edzések" <${process.env.SMTP_USER}>`,
+    to: toEmail,
+    subject: `Foglalás visszaigazolása: ${workout.base_title} (${formattedDate})`,
+    html: `
+      <div style="font-family: sans-serif; color: #4A403A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #EFE6DD; border-radius: 16px; background-color: #FDFBF7;">
+        <h2 style="color: #D88C9A; margin-top: 0;">Kedves ${participantName}!</h2>
+        <p>Sikeresen lefoglaltad a helyedet a következő edzésre:</p>
+        
+        <div style="background-color: #FFFFFF; border: 1px solid #EFE6DD; border-radius: 12px; padding: 16px; margin: 20px 0;">
+          <h3 style="margin: 0 0 8px 0; color: #4A403A;">${workout.base_title}</h3>
+          <p style="margin: 4px 0; font-size: 14px;">📅 <strong>Dátum:</strong> ${formattedDate}</p>
+          <p style="margin: 4px 0; font-size: 14px;">⏰ <strong>Időpont:</strong> ${formattedStartTime} – ${formattedEndTime}</p>
+          ${workout.description ? `<p style="margin: 10px 0 0 0; font-size: 13px; color: #8C7E75;">${workout.description}</p>` : ''}
+        </div>
+
+        <p style="margin: 24px 0; text-align: center;">
+          <a href="${googleCalUrl}" target="_blank" rel="noopener noreferrer" style="background-color: #D88C9A; color: white; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block; font-size: 14px;">
+            📅 Hozzáadás a Google Naptárhoz
+          </a>
+        </p>
+
+        <p style="font-size: 12px; color: #8C7E75; text-align: center; margin-bottom: 0;">
+          Apple Naptár vagy Outlook használata esetén nyisd meg a levélhez csatolt <strong>edzes.ics</strong> mellékletet. Sok szeretettel várlak!
+        </p>
+      </div>
+    `,
+    attachments: [
+      {
+        filename: 'edzes.ics',
+        content: icsContent,
+        contentType: 'text/calendar; charset=utf-8; method=PUBLISH',
+      },
+    ],
+  });
+}
+
 // ==========================================
 // 2. EDZÉSEK ÉS FOGLALÁSOK VÉGPONTOK
 // ==========================================
@@ -299,11 +414,19 @@ app.delete('/api/workouts/:id', authenticate, requireAdmin, async (req: AuthRequ
 app.post('/api/workouts/:id/book', optionalAuth, async (req: AuthRequest, res: Response) => {
   try {
     const workoutId = req.params.id;
-    const [workouts] = await pool.query<RowDataPacket[]>('SELECT max_capacity, start_time FROM workouts WHERE id = ?', [workoutId]);
+    const [workouts] = await pool.query<WorkoutRow[]>(
+      'SELECT id, base_title, description, start_time, end_time, max_capacity FROM workouts WHERE id = ?',
+      [workoutId]
+    );
     if (workouts.length === 0) return res.status(404).json({ error: 'Az edzés nem található.' });
 
-    const [currentBookings] = await pool.query<RowDataPacket[]>('SELECT id, user_id FROM bookings WHERE workout_id = ?', [workoutId]);
-    if (currentBookings.length >= workouts[0].max_capacity) {
+    const workout = workouts[0];
+
+    const [currentBookings] = await pool.query<RowDataPacket[]>(
+      'SELECT id, user_id FROM bookings WHERE workout_id = ?',
+      [workoutId]
+    );
+    if (currentBookings.length >= workout.max_capacity) {
       return res.status(400).json({ error: 'Erre az edzésre sajnos minden hely betelt.' });
     }
 
@@ -315,14 +438,30 @@ app.post('/api/workouts/:id/book', optionalAuth, async (req: AuthRequest, res: R
         'INSERT INTO bookings (workout_id, user_id, participant_name, age_range, is_guest) VALUES (?, ?, ?, ?, FALSE)',
         [workoutId, req.user.id, req.user.name, req.user.ageRange]
       );
+
+      // E-mail küldése a regisztrált felhasználónak
+      try {
+        await sendBookingConfirmationEmail(req.user.email, req.user.name, workout);
+      } catch (mailErr) {
+        console.error('Hiba a visszaigazoló e-mail küldésekor:', mailErr);
+      }
     } else {
-      const { name, ageRange } = req.body;
+      const { name, ageRange, email } = req.body;
       if (!name || !ageRange) return res.status(400).json({ error: 'Név és korosztály megadása kötelező.' });
 
       await pool.query(
         'INSERT INTO bookings (workout_id, user_id, participant_name, age_range, is_guest) VALUES (?, NULL, ?, ?, TRUE)',
         [workoutId, name, ageRange]
       );
+
+      // Ha a vendég is megadott e-mail címet, neki is elküldjük
+      if (email) {
+        try {
+          await sendBookingConfirmationEmail(email.trim(), name.trim(), workout);
+        } catch (mailErr) {
+          console.error('Hiba a vendég visszaigazoló e-mail küldésekor:', mailErr);
+        }
+      }
     }
 
     res.json({ success: true });
